@@ -374,9 +374,9 @@
     alert("[DEMO] Barang masuk berhasil disimulasikan!");
   }
 
-  function submitPenyaluranMulti() {
-    const nama = document.getElementById('out-nama').value;
-    const alamat = document.getElementById('out-alamat').value;
+ function submitPenyaluranMulti() {
+    const nama = document.getElementById('out-nama').value.trim();
+    const alamat = document.getElementById('out-alamat').value.trim();
     if (!nama || !alamat) return alert("Masukkan Nama & Alamat Penerima!");
 
     const items = [];
@@ -390,6 +390,7 @@
     const state = getDemoState();
     const penerimaStr = `${nama} (Alamat: ${alamat})`;
     const noTx = "BAST-DEMO-" + (state.log.length + 1);
+    const rincianBaru = [];
 
     items.forEach(it => {
       const m = state.master.find(item => item.kode === it.kode) || { nama: it.kode };
@@ -397,12 +398,44 @@
       if (rek) rek.totalStok = Math.max(0, rek.totalStok - it.jumlah);
       const b = state.batch.find(bt => bt.kode === it.kode && bt.stokSisa > 0);
       if (b) b.stokSisa = Math.max(0, b.stokSisa - it.jumlah);
-      state.log.unshift({ rowIndex: state.log.length + 2, noTx, tanggal: "2026-11-16", jenis: "KELUAR", kode: it.kode, nama: m.nama, idBatch: b ? b.idBatch : "-", jumlah: it.jumlah, pihak: penerimaStr, keterangan: "Simulasi" });
+
+      rincianBaru.push(`${m.nama} (${it.jumlah})`);
+
+      state.log.unshift({
+        rowIndex: state.log.length + 2,
+        noTx,
+        tanggal: "2026-11-16",
+        jenis: "KELUAR",
+        kode: it.kode,
+        nama: m.nama,
+        idBatch: b ? b.idBatch : "-",
+        jumlah: it.jumlah,
+        pihak: penerimaStr,
+        keterangan: "Simulasi"
+      });
     });
+
+    if (!Array.isArray(state.penerima)) state.penerima = [];
+    const totalUnitBaru = items.reduce((sum, it) => sum + it.jumlah, 0);
+    const existingPenerima = state.penerima.find(p => p.penerima === penerimaStr);
+    if (existingPenerima) {
+      existingPenerima.totalTransaksi += 1;
+      existingPenerima.totalItem += totalUnitBaru;
+      existingPenerima.rincian = existingPenerima.rincian.concat(rincianBaru);
+    } else {
+      state.penerima.push({
+        penerima: penerimaStr,
+        totalTransaksi: 1,
+        totalItem: totalUnitBaru,
+        rincian: rincianBaru
+      });
+    }
 
     saveDemoState(state);
     loadData();
-    alert("[DEMO] Penyaluran berhasil disimulasikan!");
+    document.getElementById('out-nama').value = "";
+    document.getElementById('out-alamat').value = "";
+    alert("[DEMO] Penyaluran berhasil disimulasikan & masuk Rekap Penerima!");
   }
 
   function submitPenyesuaian() {
