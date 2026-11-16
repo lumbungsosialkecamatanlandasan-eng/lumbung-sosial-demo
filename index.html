@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>[DEMO] Lumbung Sosial - Kec. Landasan Ulin</title>
+  <meta name="theme-color" content="#1e3a2f">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .sidebar { background: #1e3a2f; color: white; min-height: 100vh; padding-top: 20px; }
+    .sidebar a { color: #d1e7dd; text-decoration: none; display: block; padding: 12px 20px; border-radius: 6px; margin-bottom: 5px; cursor: pointer; }
+    .sidebar a:hover, .sidebar a.active { background: #2d5a47; color: #fff; font-weight: 600; }
+    .card-stat { border-left: 4px solid #198754; border-radius: 8px; }
+    .badge-hijau { background-color: #198754; color: white; }
+    .badge-kuning { background-color: #ffc107; color: black; }
+    .badge-merah { background-color: #dc3545; color: white; }
+    @media print {
+      .no-print { display: none !important; }
+      .main-content { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+      body { background: white; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="app-wrapper" class="container-fluid">
+  <div class="row">
+    <div class="col-md-3 col-lg-2 sidebar no-print">
+      <div class="px-3 mb-4">
+        <h5 class="fw-bold mb-0">LUMBUNG SOSIAL</h5>
+        <small class="text-warning fw-semibold">Akun Demo (Simulasi)</small>
+      </div>
+      <a onclick="showTab('dashboard')" id="nav-dashboard" class="active">📊 Dashboard & Alarm</a>
+      <a onclick="showTab('master')" id="nav-master">🏷️ Kelola Jenis Barang</a>
+      <a onclick="showTab('input')" id="nav-input">➕ Input Stok & Penyaluran</a>
+      <a onclick="showTab('retur')" id="nav-retur">🔄 Penyesuaian & Retur</a>
+      <a onclick="showTab('stok')" id="nav-stok">📋 Cek Stok & Expired</a>
+      <a onclick="showTab('penerima')" id="nav-penerima">🏘️ Rekap Penerima</a>
+      <a onclick="showTab('laporan')" id="nav-laporan">🖨️ Laporan & BAST PDF</a>
+      <a onclick="showTab('telegram')" id="nav-telegram">📲 Kirim Telegram</a>
+      <a onclick="resetDataDemo()" class="text-info mt-4">♻️ Reset Data Demo</a>
+    </div>
+
+    <div class="col-md-9 col-lg-10 p-4 main-content">
+      <div class="alert alert-warning d-flex justify-content-between align-items-center no-print">
+        <div>
+          <strong>🧪 MODE SIMULASI / AKUN DEMO</strong> — Seluruh data di halaman ini adalah data contoh dan tidak terhubung ke Google Sheets asli.
+        </div>
+        <button class="btn btn-sm btn-dark" onclick="resetDataDemo()">Reset Awal</button>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+          <h4 class="fw-bold mb-0" id="page-title">Dashboard & Alarm Expired</h4>
+          <small class="text-muted">Simulasi Standar BAST & Manajemen Logistik Kec. Landasan Ulin</small>
+        </div>
+        <button class="btn btn-outline-success btn-sm no-print" onclick="loadData()">🔄 Segarkan Tampilan</button>
+      </div>
+
+      <!-- TAB 1: DASHBOARD -->
+      <div id="tab-dashboard" class="tab-section">
+        <div class="row g-3 mb-4">
+          <div class="col-md-4"><div class="card card-stat shadow-sm p-3"><small class="text-muted">Total Jenis Logistik</small><h3 class="fw-bold mb-0" id="stat-jenis">0</h3></div></div>
+          <div class="col-md-4"><div class="card card-stat shadow-sm p-3" style="border-left-color: #0d6efd;"><small class="text-muted">Total Transaksi</small><h3 class="fw-bold mb-0" id="stat-tx">0</h3></div></div>
+          <div class="col-md-4"><div class="card card-stat shadow-sm p-3" style="border-left-color: #dc3545;"><small class="text-muted">Peringatan / Alarm Aktif</small><h3 class="fw-bold text-danger mb-0" id="stat-alarm">0</h3></div></div>
+        </div>
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-danger text-white fw-bold">🚨 Alarm Prioritas (Hijau / Kuning / Merah)</div>
+          <div class="card-body table-responsive">
+            <table class="table table-hover align-middle"><thead class="table-light"><tr><th>Status Alarm</th><th>Kode / Batch</th><th>Nama Barang</th><th>Sisa</th><th>Keterangan</th></tr></thead><tbody id="tabel-alarm"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: MASTER -->
+      <div id="tab-master" class="tab-section d-none">
+        <div class="row g-4">
+          <div class="col-md-4">
+            <div class="card shadow-sm"><div class="card-header bg-success text-white fw-bold">➕ Tambah / Edit Barang</div>
+            <div class="card-body">
+              <input type="hidden" id="edit-row-index">
+              <div class="mb-2"><label class="form-label small">Kode Barang</label><input type="text" id="m-kode" class="form-control" placeholder="A-005"></div>
+              <div class="mb-2"><label class="form-label small">Nama Barang</label><input type="text" id="m-nama" class="form-control" placeholder="Gula Pasir 1 Kg"></div>
+              <div class="mb-2"><label class="form-label small">Kategori</label><select id="m-kategori" class="form-select"><option value="Pangan">Pangan / Makanan</option><option value="Peralatan">Peralatan</option><option value="Sandang">Sandang</option></select></div>
+              <div class="mb-2"><label class="form-label small">Satuan</label><input type="text" id="m-satuan" class="form-control" value="Paket"></div>
+              <div class="mb-3"><label class="form-label small">Minimum Stok Alarm</label><input type="number" id="m-min" class="form-control" value="10"></div>
+              <button onclick="simpanMasterBarang()" class="btn btn-success w-100">Simpan Barang</button>
+            </div></div>
+          </div>
+          <div class="col-md-8"><div class="card shadow-sm"><div class="card-header bg-white fw-bold">📋 Daftar Master Jenis Barang</div><div class="card-body table-responsive"><table class="table table-bordered table-striped align-middle"><thead class="table-dark"><tr><th>Kode</th><th>Nama</th><th>Kategori</th><th>Satuan</th><th>Min</th><th>Aksi</th></tr></thead><tbody id="tabel-master"></tbody></table></div></div></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: INPUT -->
+      <div id="tab-input" class="tab-section d-none">
+        <div class="row g-4">
+          <div class="col-md-5">
+            <div class="card shadow-sm h-100"><div class="card-header bg-success text-white fw-bold">📥 Barang Masuk Satuan</div>
+            <div class="card-body">
+              <div class="mb-2"><label class="form-label small">Barang</label><select id="in-kode" class="form-select select-barang"></select></div>
+              <div class="mb-2"><label class="form-label small">Jumlah</label><input type="number" id="in-jumlah" class="form-control"></div>
+              <div class="mb-2"><label class="form-label small">Tgl Expired (Pangan)</label><input type="date" id="in-exp" class="form-control"></div>
+              <div class="mb-3"><label class="form-label small">Sumber</label><input type="text" id="in-sumber" class="form-control" placeholder="Kemensos / APBD"></div>
+              <button onclick="submitMasuk()" class="btn btn-success w-100">Simpan Masuk</button>
+            </div></div>
+          </div>
+          <div class="col-md-7">
+            <div class="card shadow-sm h-100"><div class="card-header bg-primary text-white fw-bold">📤 Penyaluran Keluar (Multi-Item)</div>
+            <div class="card-body">
+              <div class="row mb-2">
+                <div class="col-md-6"><label class="form-label small">Nama Penerima</label><input type="text" id="out-nama" class="form-control" placeholder="Bapak Ahmad"></div>
+                <div class="col-md-6"><label class="form-label small">Alamat Penerima</label><input type="text" id="out-alamat" class="form-control" placeholder="RT. 05 RW. 02"></div>
+              </div>
+              <hr><label class="form-label small fw-bold">Daftar Barang Bantuan:</label>
+              <div id="item-list-container" class="mb-2">
+                <div class="row g-2 mb-2 item-row">
+                  <div class="col-7"><select class="form-select select-barang item-kode"></select></div>
+                  <div class="col-4"><input type="number" class="form-control item-jumlah" placeholder="Jumlah"></div>
+                  <div class="col-1"><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('.item-row').remove()">×</button></div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-outline-secondary btn-sm mb-3" onclick="tambahBarisItem()">+ Tambah Barang</button>
+              <button onclick="submitPenyaluranMulti()" class="btn btn-primary w-100 fw-bold">Proses Penyaluran (Simulasi)</button>
+            </div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: RETUR -->
+      <div id="tab-retur" class="tab-section d-none">
+        <div class="row justify-content-center"><div class="col-md-6">
+          <div class="card shadow-sm"><div class="card-header bg-warning text-dark fw-bold">🔄 Penyesuaian, Retur & Pemusnahan Stok</div>
+          <div class="card-body">
+            <div class="mb-2"><label class="form-label small">Pilih Barang</label><select id="adj-kode" class="form-select select-barang"></select></div>
+            <div class="mb-2"><label class="form-label small">Tipe Penyesuaian</label>
+              <select id="adj-tipe" class="form-select">
+                <option value="TAMBAH_RETUR">Retur Masuk (Stok Kembali)</option>
+                <option value="KOREKSI_RETUR_DINSOS">Retur Kembali ke Dinsos (Stok Berkurang)</option>
+                <option value="KOREKSI_PEMUSNAHAN">Pemusnahan Barang Expired / Rusak (Stok Berkurang)</option>
+              </select>
+            </div>
+            <div class="mb-2"><label class="form-label small">Jumlah Unit</label><input type="number" id="adj-jumlah" class="form-control"></div>
+            <div class="mb-3"><label class="form-label small">Alasan</label><input type="text" id="adj-alasan" class="form-control" placeholder="Keterangan / Berita Acara"></div>
+            <button onclick="submitPenyesuaian()" class="btn btn-warning w-100 fw-bold">Simpan Penyesuaian</button>
+          </div></div>
+        </div></div>
+      </div>
+
+      <!-- TAB 5: STOK -->
+      <div id="tab-stok" class="tab-section d-none">
+        <div class="card shadow-sm mb-4"><div class="card-header bg-white fw-bold">📦 Total Stok Gudang</div><div class="card-body table-responsive"><table class="table table-bordered table-striped"><thead class="table-dark"><tr><th>Kode</th><th>Nama</th><th>Kategori</th><th>Total Stok</th><th>Status Warna</th></tr></thead><tbody id="tabel-rekap-stok"></tbody></table></div></div>
+        <div class="card shadow-sm"><div class="card-header bg-white fw-bold">📅 Tanggal Expired Per Batch (Pangan)</div><div class="card-body table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-secondary"><tr><th>ID Batch</th><th>Nama Barang</th><th>Tgl Masuk</th><th>Tgl Expired</th><th>Sisa Stok</th><th>Sisa Hari</th><th>Status</th></tr></thead><tbody id="tabel-batch"></tbody></table></div></div>
+      </div>
+
+      <!-- TAB 6: PENERIMA -->
+      <div id="tab-penerima" class="tab-section d-none">
+        <div class="card shadow-sm"><div class="card-header bg-white d-flex justify-content-between align-items-center"><span class="fw-bold">🏘️ Rekapitulasi Penerima</span><button class="btn btn-sm btn-secondary no-print" onclick="window.print()">🖨️ Print</button></div>
+        <div class="card-body table-responsive"><table class="table table-bordered"><thead class="table-dark"><tr><th>Nama & Alamat Penerima</th><th>Frekuensi</th><th>Total Unit</th><th>Rincian</th></tr></thead><tbody id="tabel-penerima"></tbody></table></div></div>
+      </div>
+
+      <!-- TAB 7: LAPORAN -->
+      <div id="tab-laporan" class="tab-section d-none">
+        <div class="card shadow-sm mb-3 no-print"><div class="card-body d-flex gap-2"><button class="btn btn-outline-success" onclick="exportToExcel()">📊 Export Excel</button><button class="btn btn-outline-danger" onclick="window.print()">🖨️ Print PDF</button></div></div>
+        <div class="card shadow-sm"><div class="card-header bg-white fw-bold">📜 Riwayat Transaksi & BAST</div><div class="card-body table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-dark"><tr><th>No. Tx</th><th>Tanggal</th><th>Jenis</th><th>Barang</th><th>Jumlah</th><th>Penerima</th><th class="no-print">Aksi</th></tr></thead><tbody id="tabel-log"></tbody></table></div></div>
+      </div>
+
+      <!-- TAB 8: KIRIM TELEGRAM MANUAL (SIMULASI) -->
+      <div id="tab-telegram" class="tab-section d-none">
+        <div class="row justify-content-center">
+          <div class="col-md-7">
+            <div class="card shadow-sm">
+              <div class="card-header bg-success text-white fw-bold">📲 Simulasi Kirim Laporan ke Telegram</div>
+              <div class="card-body">
+                <p class="small text-muted">
+                  Pada akun demo, fitur ini menampilkan pratinjau pesan laporan yang akan dikirim ke Chat ID tujuan tanpa memanggil bot Telegram asli.
+                </p>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold">ID Penerima Telegram (Chat ID)</label>
+                  <input type="text" id="tg-chat-id" class="form-control" placeholder="Contoh: 410058020">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold">Jenis Laporan yang Dikirim</label>
+                  <select id="tg-tipe-laporan" class="form-select">
+                    <option value="stok">📦 Rekap Sisa Stok Gudang</option>
+                    <option value="alarm">🚨 Peringatan Alarm Stok / Expired</option>
+                    <option value="penerima">🏘️ Rekap Penerima Bantuan</option>
+                  </select>
+                </div>
+                <button type="button" onclick="kirimLaporanTelegram()" class="btn btn-success w-100 fw-bold">
+                  📤 Simulasikan Pengiriman
+                </button>
+                <pre id="tg-preview" class="mt-3 p-3 bg-light border rounded small d-none"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT -->
+<div class="modal fade" id="modalEdit" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-primary text-white"><h5 class="modal-title">Edit Penerima</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" id="edit-log-row"><div class="mb-2"><label class="form-label small">Penerima</label><input type="text" id="edit-pihak" class="form-control"></div><div class="mb-3"><label class="form-label small">Keterangan</label><input type="text" id="edit-ket" class="form-control"></div><button onclick="simpanEditTransaksi()" class="btn btn-primary w-100">Simpan</button></div></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let masterOptionsHtml = '';
+
+  const DEMO_INITIAL_DATA = {
+    master: [
+      { rowIndex: 2, kode: "A-001", nama: "Beras Premium 5 Kg", kategori: "Pangan", satuan: "Karung", minStok: 15 },
+      { rowIndex: 3, kode: "A-002", nama: "Minyak Goreng 1 L", kategori: "Pangan", satuan: "Pouch", minStok: 20 },
+      { rowIndex: 4, kode: "A-003", nama: "Selimut Wol Tebal", kategori: "Sandang", satuan: "Lembar", minStok: 10 },
+      { rowIndex: 5, kode: "A-004", nama: "Family Kit Dasar", kategori: "Peralatan", satuan: "Paket", minStok: 8 }
+    ],
+    batch: [
+      { idBatch: "B-DEMO-01", kode: "A-001", nama: "Beras Premium 5 Kg", tglMasuk: "2026-10-01", tglExpired: "2026-12-05", stokAwal: 50, stokSisa: 35, sumber: "Dinsos Prov", sisaHari: 19, statusWarna: "MERAH" },
+      { idBatch: "B-DEMO-02", kode: "A-002", nama: "Minyak Goreng 1 L", tglMasuk: "2026-10-15", tglExpired: "2027-01-05", stokAwal: 40, stokSisa: 14, sumber: "APBD", sisaHari: 50, statusWarna: "KUNING" },
+      { idBatch: "B-DEMO-03", kode: "A-003", nama: "Selimut Wol Tebal", tglMasuk: "2026-09-10", tglExpired: "-", stokAwal: 30, stokSisa: 25, sumber: "Kemensos", sisaHari: null, statusWarna: "HIJAU" },
+      { idBatch: "B-DEMO-04", kode: "A-004", nama: "Family Kit Dasar", tglMasuk: "2026-11-01", tglExpired: "-", stokAwal: 12, stokSisa: 6, sumber: "Kemensos", sisaHari: null, statusWarna: "KUNING" }
+    ],
+    rekapStok: [
+      { kode: "A-001", nama: "Beras Premium 5 Kg", kategori: "Pangan", satuan: "Karung", totalStok: 35, statusWarna: "HIJAU" },
+      { kode: "A-002", nama: "Minyak Goreng 1 L", kategori: "Pangan", satuan: "Pouch", totalStok: 14, statusWarna: "KUNING" },
+      { kode: "A-003", nama: "Selimut Wol Tebal", kategori: "Sandang", satuan: "Lembar", totalStok: 25, statusWarna: "HIJAU" },
+      { kode: "A-004", nama: "Family Kit Dasar", kategori: "Peralatan", satuan: "Paket", totalStok: 6, statusWarna: "KUNING" }
+    ],
+    alarm: [
+      { level: "MERAH", batch: "B-DEMO-01", nama: "Beras Premium 5 Kg", sisa: "35 Karung", info: "Sisa 19 hari lagi (Exp: 2026-12-05)" },
+      { level: "KUNING", batch: "B-DEMO-02", nama: "Minyak Goreng 1 L", sisa: "14 Pouch", info: "Stok di bawah batas minimum (20) & Exp 50 hari lagi" },
+      { level: "KUNING", batch: "B-DEMO-04", nama: "Family Kit Dasar", sisa: "6 Paket", info: "Stok di bawah batas minimum (8)" }
+    ],
+    log: [
+      { rowIndex: 2, noTx: "BAST-DEMO-001", tanggal: "2026-11-10", jenis: "KELUAR", kode: "A-001", nama: "Beras Premium 5 Kg", idBatch: "B-DEMO-01", jumlah: 10, pihak: "Bapak Ahmad (Alamat: RT. 05 RW. 02)", keterangan: "Bantuan Sosial" },
+      { rowIndex: 3, noTx: "BAST-DEMO-002", tanggal: "2026-11-12", jenis: "KELUAR", kode: "A-002", nama: "Minyak Goreng 1 L", idBatch: "B-DEMO-02", jumlah: 6, pihak: "Ibu Siti (Alamat: RT. 03 RW. 01)", keterangan: "Bantuan Sosial" },
+      { rowIndex: 4, noTx: "IN-DEMO-001", tanggal: "2026-11-01", jenis: "MASUK", kode: "A-004", nama: "Family Kit Dasar", idBatch: "B-DEMO-04", jumlah: 12, pihak: "Kemensos", keterangan: "Stok Awal" }
+    ],
+    penerima: [
+      { penerima: "Bapak Ahmad (Alamat: RT. 05 RW. 02)", totalTransaksi: 1, totalItem: 10, rincian: ["Beras Premium 5 Kg (10)"] },
+      { penerima: "Ibu Siti (Alamat: RT. 03 RW. 01)", totalTransaksi: 1, totalItem: 6, rincian: ["Minyak Goreng 1 L (6)"] }
+    ]
+  };
+
+  function getDemoState() {
+    const saved = sessionStorage.getItem("lumbung_vercel_demo");
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    const fresh = JSON.parse(JSON.stringify(DEMO_INITIAL_DATA));
+    sessionStorage.setItem("lumbung_vercel_demo", JSON.stringify(fresh));
+    return fresh;
+  }
+
+  function saveDemoState(state) {
+    sessionStorage.setItem("lumbung_vercel_demo", JSON.stringify(state));
+  }
+
+  function resetDataDemo() {
+    sessionStorage.removeItem("lumbung_vercel_demo");
+    loadData();
+    alert("Data simulasi dikembalikan ke kondisi awal.");
+  }
+
+  const tabTitles = {
+    dashboard: "Dashboard & Alarm Expired",
+    master: "Kelola Jenis Barang",
+    input: "Input Stok & Penyaluran",
+    retur: "Penyesuaian & Retur",
+    stok: "Cek Stok & Expired",
+    penerima: "Rekap Penerima",
+    laporan: "Laporan & BAST PDF",
+    telegram: "Simulasi Kirim Laporan Telegram"
+  };
+
+  function showTab(tabName) {
+    document.querySelectorAll('.tab-section').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.sidebar a').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tabName).classList.remove('d-none');
+    document.getElementById('nav-' + tabName).classList.add('active');
+    if (tabTitles[tabName]) document.getElementById('page-title').innerText = tabTitles[tabName];
+  }
+
+  function loadData() {
+    renderData(getDemoState());
+  }
+
+  function renderData(data) {
+    document.getElementById('stat-jenis').innerText = data.master.length + " Item";
+    document.getElementById('stat-tx').innerText = data.log.length + " Transaksi";
+    document.getElementById('stat-alarm').innerText = data.alarm.length + " Peringatan";
+
+    masterOptionsHtml = data.master.map(m => `<option value="${m.kode}">${m.kode} - ${m.nama}</option>`).join('');
+    document.querySelectorAll('.select-barang').forEach(sel => sel.innerHTML = masterOptionsHtml);
+
+    document.getElementById('tabel-master').innerHTML = data.master.map(m => `
+      <tr><td>${m.kode}</td><td>${m.nama}</td><td>${m.kategori}</td><td>${m.satuan}</td><td>${m.minStok}</td>
+      <td><button class="btn btn-sm btn-warning" onclick="pilihEditMaster(${m.rowIndex}, '${m.kode}', '${m.nama}', '${m.kategori}', '${m.satuan}', ${m.minStok})">Edit</button></td></tr>`).join('');
+
+    document.getElementById('tabel-alarm').innerHTML = data.alarm.length === 0
+      ? '<tr><td colspan="5" class="text-center text-success fw-bold">✅ Semua aman.</td></tr>'
+      : data.alarm.map(a => `<tr><td><span class="badge badge-${a.level.toLowerCase()}">${a.level}</span></td><td>${a.batch}</td><td class="fw-bold">${a.nama}</td><td>${a.sisa}</td><td>${a.info}</td></tr>`).join('');
+
+    document.getElementById('tabel-rekap-stok').innerHTML = data.rekapStok.map(s => `
+      <tr><td>${s.kode}</td><td class="fw-bold">${s.nama}</td><td>${s.kategori}</td><td class="fw-bold">${s.totalStok} ${s.satuan}</td>
+      <td><span class="badge badge-${s.statusWarna.toLowerCase()}">${s.statusWarna}</span></td></tr>`).join('');
+
+    document.getElementById('tabel-batch').innerHTML = data.batch.map(b => `
+      <tr><td>${b.idBatch}</td><td class="fw-bold">${b.nama}</td><td>${b.tglMasuk}</td><td>${b.tglExpired}</td><td class="fw-bold">${b.stokSisa}</td><td>${b.sisaHari !== null ? b.sisaHari + ' hari' : '-'}</td><td><span class="badge badge-${b.statusWarna.toLowerCase()}">${b.statusWarna}</span></td></tr>`).join('');
+
+    document.getElementById('tabel-penerima').innerHTML = data.penerima.map(p => `
+      <tr><td class="fw-bold">${p.penerima}</td><td>${p.totalTransaksi} Kali</td><td class="fw-bold">${p.totalItem} Unit</td><td>${p.rincian.join(', ')}</td></tr>`).join('');
+
+    document.getElementById('tabel-log').innerHTML = data.log.map(l => `
+      <tr>
+        <td><code>${l.noTx}</code></td><td>${l.tanggal}</td>
+        <td><span class="badge ${l.jenis === 'MASUK' ? 'bg-success' : (l.jenis === 'KELUAR' ? 'bg-primary' : 'bg-warning text-dark')}">${l.jenis}</span></td>
+        <td>${l.nama}</td><td class="fw-bold">${l.jumlah}</td><td>${l.pihak}</td>
+        <td class="no-print">
+          ${l.jenis === 'KELUAR' ? `
+            <button class="btn btn-sm btn-outline-danger" onclick="alert('[DEMO] Dokumen BAST PDF hanya dibuat pada web produksi.')">📄 PDF</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="bukaModalEdit(${l.rowIndex}, '${l.pihak}', '${l.keterangan}')">✏️</button>
+            <button class="btn btn-sm btn-danger" onclick="hapusTransaksi(${l.rowIndex})">🗑️</button>
+          ` : '-'}
+        </td>
+      </tr>`).join('');
+  }
+
+  function kirimLaporanTelegram() {
+    const chatId = document.getElementById('tg-chat-id').value.trim() || "410058020 (default)";
+    const tipe = document.getElementById('tg-tipe-laporan').value;
+    const state = getDemoState();
+    const previewEl = document.getElementById('tg-preview');
+
+    let isi = `SIMULASI KIRIM KE CHAT ID: ${chatId}\n----------------------------------\n`;
+    if (tipe === "stok") {
+      isi += "REKAP SISA STOK GUDANG (DEMO)\n" + state.rekapStok.map(s => `- ${s.nama} (${s.kode}): ${s.totalStok} ${s.satuan}`).join("\n");
+    } else if (tipe === "alarm") {
+      isi += "PERINGATAN ALARM STOK (DEMO)\n" + state.alarm.map(a => `- [${a.level}] ${a.nama}: ${a.info}`).join("\n");
+    } else {
+      isi += "REKAP PENERIMA BANTUAN (DEMO)\n" + state.penerima.map(p => `- ${p.penerima}: ${p.totalItem} unit`).join("\n");
+    }
+
+    previewEl.classList.remove('d-none');
+    previewEl.textContent = isi;
+  }
+
+  function tambahBarisItem() {
+    const container = document.getElementById('item-list-container');
+    const newRow = document.createElement('div');
+    newRow.className = "row g-2 mb-2 item-row";
+    newRow.innerHTML = `<div class="col-7"><select class="form-select select-barang item-kode">${masterOptionsHtml}</select></div><div class="col-4"><input type="number" class="form-control item-jumlah" placeholder="Jumlah"></div><div class="col-1"><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('.item-row').remove()">×</button></div>`;
+    container.appendChild(newRow);
+  }
+
+  function submitMasuk() {
+    const kode = document.getElementById('in-kode').value;
+    const jml = parseInt(document.getElementById('in-jumlah').value);
+    const exp = document.getElementById('in-exp').value || "-";
+    const sumber = document.getElementById('in-sumber').value || "Simulasi";
+    if (!jml) return alert("Isi jumlah!");
+
+    const state = getDemoState();
+    const m = state.master.find(item => item.kode === kode) || { nama: kode, satuan: "" };
+    const idBatch = "B-DEMO-" + (state.batch.length + 1);
+    state.batch.push({ idBatch, kode, nama: m.nama, tglMasuk: "2026-11-16", tglExpired: exp, stokAwal: jml, stokSisa: jml, sumber, sisaHari: null, statusWarna: "HIJAU" });
+    const rek = state.rekapStok.find(r => r.kode === kode);
+    if (rek) rek.totalStok += jml;
+    state.log.unshift({ rowIndex: state.log.length + 2, noTx: "IN-DEMO-" + (state.log.length + 1), tanggal: "2026-11-16", jenis: "MASUK", kode, nama: m.nama, idBatch, jumlah: jml, pihak: sumber, keterangan: "Simulasi" });
+    saveDemoState(state);
+    loadData();
+    alert("[DEMO] Barang masuk berhasil disimulasikan!");
+  }
+
+  function submitPenyaluranMulti() {
+    const nama = document.getElementById('out-nama').value;
+    const alamat = document.getElementById('out-alamat').value;
+    if (!nama || !alamat) return alert("Masukkan Nama & Alamat Penerima!");
+
+    const items = [];
+    document.querySelectorAll('.item-row').forEach(row => {
+      const kode = row.querySelector('.item-kode').value;
+      const jumlah = parseInt(row.querySelector('.item-jumlah').value);
+      if (kode && jumlah > 0) items.push({ kode, jumlah });
+    });
+    if (items.length === 0) return alert("Pilih minimal 1 barang!");
+
+    const state = getDemoState();
+    const penerimaStr = `${nama} (Alamat: ${alamat})`;
+    const noTx = "BAST-DEMO-" + (state.log.length + 1);
+
+    items.forEach(it => {
+      const m = state.master.find(item => item.kode === it.kode) || { nama: it.kode };
+      const rek = state.rekapStok.find(r => r.kode === it.kode);
+      if (rek) rek.totalStok = Math.max(0, rek.totalStok - it.jumlah);
+      const b = state.batch.find(bt => bt.kode === it.kode && bt.stokSisa > 0);
+      if (b) b.stokSisa = Math.max(0, b.stokSisa - it.jumlah);
+      state.log.unshift({ rowIndex: state.log.length + 2, noTx, tanggal: "2026-11-16", jenis: "KELUAR", kode: it.kode, nama: m.nama, idBatch: b ? b.idBatch : "-", jumlah: it.jumlah, pihak: penerimaStr, keterangan: "Simulasi" });
+    });
+
+    saveDemoState(state);
+    loadData();
+    alert("[DEMO] Penyaluran berhasil disimulasikan!");
+  }
+
+  function submitPenyesuaian() {
+    const kode = document.getElementById('adj-kode').value;
+    const tipe = document.getElementById('adj-tipe').value;
+    const jumlah = parseInt(document.getElementById('adj-jumlah').value);
+    const alasan = document.getElementById('adj-alasan').value;
+    if (!jumlah || !alasan) return alert("Lengkapi jumlah & alasan!");
+
+    const state = getDemoState();
+    const m = state.master.find(item => item.kode === kode) || { nama: kode };
+    const rek = state.rekapStok.find(r => r.kode === kode);
+    if (rek) rek.totalStok = tipe === 'TAMBAH_RETUR' ? rek.totalStok + jumlah : Math.max(0, rek.totalStok - jumlah);
+    state.log.unshift({ rowIndex: state.log.length + 2, noTx: "ADJ-DEMO-" + (state.log.length + 1), tanggal: "2026-11-16", jenis: tipe, kode, nama: m.nama, idBatch: "-", jumlah, pihak: alasan, keterangan: alasan });
+    saveDemoState(state);
+    loadData();
+    alert("[DEMO] Penyesuaian stok berhasil disimulasikan!");
+  }
+
+  function hapusTransaksi(rowIdx) {
+    if (!confirm("Hapus transaksi simulasi ini?")) return;
+    const state = getDemoState();
+    state.log = state.log.filter(l => Number(l.rowIndex) !== Number(rowIdx));
+    saveDemoState(state);
+    loadData();
+  }
+
+  function exportToExcel() {
+    const table = document.getElementById("tabel-log");
+    const wb = XLSX.utils.table_to_book(table, { sheet: "Laporan_Demo" });
+    XLSX.writeFile(wb, "Laporan_Demo_Lumbung_Sosial.xlsx");
+  }
+
+  function bukaModalEdit(rowIdx, pihak, ket) {
+    document.getElementById('edit-log-row').value = rowIdx;
+    document.getElementById('edit-pihak').value = pihak;
+    document.getElementById('edit-ket').value = ket;
+    new bootstrap.Modal(document.getElementById('modalEdit')).show();
+  }
+
+  function simpanEditTransaksi() {
+    const rowIdx = document.getElementById('edit-log-row').value;
+    const state = getDemoState();
+    const target = state.log.find(l => Number(l.rowIndex) === Number(rowIdx));
+    if (target) {
+      target.pihak = document.getElementById('edit-pihak').value;
+      target.keterangan = document.getElementById('edit-ket').value;
+    }
+    saveDemoState(state);
+    bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
+    loadData();
+  }
+
+  function simpanMasterBarang() {
+    const rowIdx = document.getElementById('edit-row-index').value;
+    const kode = document.getElementById('m-kode').value;
+    const nama = document.getElementById('m-nama').value;
+    const kat = document.getElementById('m-kategori').value;
+    const sat = document.getElementById('m-satuan').value;
+    const min = parseInt(document.getElementById('m-min').value) || 10;
+    const state = getDemoState();
+
+    if (rowIdx) {
+      const target = state.master.find(m => Number(m.rowIndex) === Number(rowIdx));
+      if (target) Object.assign(target, { kode, nama, kategori: kat, satuan: sat, minStok: min });
+    } else {
+      state.master.push({ rowIndex: state.master.length + 2, kode, nama, kategori: kat, satuan: sat, minStok: min });
+      state.rekapStok.push({ kode, nama, kategori: kat, satuan: sat, totalStok: 0, statusWarna: "MERAH" });
+    }
+    saveDemoState(state);
+    loadData();
+    alert("[DEMO] Master barang tersimpan.");
+  }
+
+  function pilihEditMaster(rowIdx, kode, nama, kat, sat, min) {
+    document.getElementById('edit-row-index').value = rowIdx;
+    document.getElementById('m-kode').value = kode;
+    document.getElementById('m-nama').value = nama;
+    document.getElementById('m-kategori').value = kat;
+    document.getElementById('m-satuan').value = sat;
+    document.getElementById('m-min').value = min;
+    showTab('master');
+  }
+
+  window.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>
